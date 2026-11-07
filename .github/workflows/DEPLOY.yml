@@ -1,0 +1,47 @@
+name: DEPLOY.yml
+on:
+  push:
+    tags:
+      - 'v\d+\.\d+\.\d+'
+permissions:
+  id-token: write # Required for requesting the JWT/OIDC token
+  contents: read  # Required for actions/checkout
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Pull Code
+        uses: actions/checkout@v7
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ secrets.WORKLOAD_IDENTITY_POOL }}/providers/${{ secrets.PROVIDER }}
+          service_account: ${{ secrets.IMPERSONATED_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Set Short SHA
+        id: SHORT_SHA
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short ${{ github.sha }})" >> $GITHUB_ENV
+
+      - name: Submit Cloud Build
+        run: |
+          SUBSTITUTIONS="_LOCATION=${{ vars.LOCATION }}"
+          SUBSTITUTIONS="${SUBSTITUTIONS},_REPO_NAME=${{ vars.REPO_NAME }}"
+          SUBSTITUTIONS="${SUBSTITUTIONS},_IMAGE_NAME=${{ vars.IMAGE_NAME }}"
+          SUBSTITUTIONS="${SUBSTITUTIONS},_SHORT_SHA=${{ env.SHORT_SHA }}"
+          SUBSTITUTIONS="${SUBSTITUTIONS},_BUILDER=${{ vars.BUILDER }}"
+          SUBSTITUTIONS="${SUBSTITUTIONS},_SERVICE_NAME=${{ vars.SERVICE_NAME }}"
+          SUBSTITUTIONS="${SUBSTITUTIONS},_SERVICE_ACCOUNT=${{ secrets.CLOUD_RUN_SERVICE_ACCOUNT }}"
+          gcloud builds submit . --gcs-source-staging-dir gs://${{ secrets.STAGING_BUCKET_NAME }}/source \
+          --region ${{ vars.LOCATION }} \
+          --service-account projects/${{ secrets.GCP_PROJECT_ID }}/serviceAccounts/${{ secrets.CLOUD_BUILD_SERVICE_ACCOUNT }} \
+          --substitutions="${SUBSTITUTIONS}"
