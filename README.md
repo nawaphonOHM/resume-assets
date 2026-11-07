@@ -6,7 +6,7 @@ A small Go HTTP service for serving authorized static assets. It looks up asset 
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/assets/{filename}` | Streams one asset whose MongoDB `access` value is exactly `allow`. `filename` is one decoded path segment. |
+| `GET` | `/assets/{filename}` | Streams one asset whose MongoDB `access` value is exactly `ALLOW`. `filename` is one decoded path segment. |
 | `GET` | `/health` | Framework health probe. |
 | `GET` | `/ready` | Framework readiness probe. |
 
@@ -20,13 +20,13 @@ The server reads the fixed MongoDB collection named `assets`. Documents use this
 {
   "filename": "app.js",
   "location": "s3://assets-bucket/path/app.js",
-  "access": "allow"
+  "access": "ALLOW"
 }
 ```
 
 - `filename` is the exact lookup key and must be unique. Create a MongoDB unique index on `filename` before using the service; the server does not modify the database or create indexes automatically.
 - `location` identifies an object as described below.
-- `access` must be exactly `allow` for storage access. `deny`, a missing field, or any other value (including a non-string value) is rejected with HTTP `403`.
+- `access` must be exactly `ALLOW` for storage access. `DENY`, a missing field, lowercase values, or any other value (including a non-string value) is rejected with HTTP `403`.
 
 Missing metadata and missing storage objects return `404`. Invalid metadata and backend failures return a generic `500` response; internal error details are logged, not returned to clients.
 
