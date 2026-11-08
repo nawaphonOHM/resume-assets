@@ -7,6 +7,8 @@ import (
 	libmongodb "github.com/nawaphonOHM/whatever/v3/pkg/testing/mongodb"
 )
 
+const testNonStringLocation = 42
+
 func TestAssetRecordStringFieldsRoundTrip(t *testing.T) {
 	original := assetRecord{Filename: testFilename, Location: "s3://bucket/key", Access: "ALLOW"}
 	encoded, err := libmongodb.Marshal(original)
@@ -22,32 +24,37 @@ func TestAssetRecordStringFieldsRoundTrip(t *testing.T) {
 
 func TestAssetRecordUntrustedFieldsFailClosed(t *testing.T) {
 	tests := []struct {
-		name   string
 		fields map[string]any
+		name   string
 	}{
 		{name: "non-string access", fields: map[string]any{"access": false}},
-		{name: "non-string location", fields: map[string]any{"location": 42}},
+		{name: "non-string location", fields: map[string]any{"location": testNonStringLocation}},
 		{name: "null fields", fields: map[string]any{"access": nil, "location": nil}},
-		{name: "missing fields", fields: map[string]any{}},
+		{name: "missing fields", fields: make(map[string]any)},
 		{
-			name: "non-string access and location",
-			fields: map[string]any{"access": false, "location": 42},
+			name:   "non-string access and location",
+			fields: map[string]any{"access": false, "location": testNonStringLocation},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			original := map[string]any{"filename": testFilename}
-			for key, value := range test.fields {
-				original[key] = value
-			}
-			encoded, err := libmongodb.Marshal(original)
-			if err != nil {
-				t.Fatalf("marshal asset record: %v", err)
-			}
-			document := decodeAssetRecord(t, encoded).toAssetDocument()
-			assertUntrustedFields(t, document)
+			checkUntrustedFields(t, test.fields)
 		})
 	}
+}
+
+func checkUntrustedFields(t *testing.T, fields map[string]any) {
+	t.Helper()
+	original := map[string]any{"filename": testFilename}
+	for key, value := range fields {
+		original[key] = value
+	}
+	encoded, err := libmongodb.Marshal(original)
+	if err != nil {
+		t.Fatalf("marshal asset record: %v", err)
+	}
+	document := decodeAssetRecord(t, encoded).toAssetDocument()
+	assertUntrustedFields(t, document)
 }
 
 func assertUntrustedFields(t *testing.T, document *domain.AssetDocument) {
