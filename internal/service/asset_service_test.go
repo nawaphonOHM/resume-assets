@@ -19,6 +19,7 @@ const (
 type testContextKey string
 
 type repositoryCall struct {
+	criteria *domain.AssetCriteria
 	ctx      context.Context
 	filename string
 }
@@ -29,8 +30,12 @@ type repositoryFake struct {
 	call     *repositoryCall
 }
 
-func (r *repositoryFake) FindAsset(ctx context.Context, filename string) (*domain.AssetDocument, error) {
-	r.call = &repositoryCall{ctx: ctx, filename: filename}
+func (r *repositoryFake) FindAsset(
+	ctx context.Context,
+	filename string,
+	criteria *domain.AssetCriteria,
+) (*domain.AssetDocument, error) {
+	r.call = &repositoryCall{ctx: ctx, filename: filename, criteria: criteria}
 	return r.document, r.err
 }
 

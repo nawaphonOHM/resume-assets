@@ -43,8 +43,24 @@ func NewAssetService(
 }
 
 // FindAllowedAsset looks up metadata and permits only an exact "ALLOW" access value.
-func (s *AssetService) FindAllowedAsset(ctx context.Context, filename string) (*domain.AssetDocument, error) {
-	document, err := s.repository.FindAsset(ctx, filename)
+func (s *AssetService) FindAllowedAsset(
+	ctx context.Context,
+	filename string,
+	criteriaJSON *string,
+) (*domain.AssetDocument, error) {
+	criteria, err := parseOptionalAssetCriteria(criteriaJSON)
+	if err != nil {
+		return nil, err
+	}
+	return s.findAllowedWithCriteria(ctx, filename, criteria)
+}
+
+func (s *AssetService) findAllowedWithCriteria(
+	ctx context.Context,
+	filename string,
+	criteria *domain.AssetCriteria,
+) (*domain.AssetDocument, error) {
+	document, err := s.repository.FindAsset(ctx, filename, criteria)
 	if err != nil {
 		return nil, fmt.Errorf("lookup asset metadata for filename %q: %w", filename, err)
 	}
@@ -54,29 +70,13 @@ func (s *AssetService) FindAllowedAsset(ctx context.Context, filename string) (*
 	return document, nil
 }
 
-func validateAssetDocument(document *domain.AssetDocument, filename string) error {
-	if err := validateAssetAccess(document); err != nil {
-		return err
-	}
-	if document.Filename != filename {
-		return domain.ErrInvalidAssetMetadata
-	}
-	return nil
-}
-
-func validateAssetAccess(document *domain.AssetDocument) error {
-	if document == nil {
-		return domain.ErrInvalidAssetMetadata
-	}
-	if document.Access != "ALLOW" {
-		return domain.ErrAssetAccessDenied
-	}
-	return nil
-}
-
 // GetAsset retrieves an allowed object and its response metadata.
-func (s *AssetService) GetAsset(ctx context.Context, filename string) (*domain.StaticAsset, error) {
-	document, err := s.FindAllowedAsset(ctx, filename)
+func (s *AssetService) GetAsset(
+	ctx context.Context,
+	filename string,
+	criteriaJSON *string,
+) (*domain.StaticAsset, error) {
+	document, err := s.FindAllowedAsset(ctx, filename, criteriaJSON)
 	if err != nil {
 		return nil, err
 	}

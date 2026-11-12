@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"io"
 	"strings"
 	"sync"
 	"time"
@@ -25,14 +24,19 @@ const (
 type routerAssetService struct {
 	body      *integrationBody
 	filenames []string
+	criteria  []*string
 	mu        sync.Mutex
 }
 
-func (s *routerAssetService) GetAsset(ctx context.Context, filename string) (*domain.StaticAsset, error) {
+func (s *routerAssetService) GetAsset(
+	ctx context.Context,
+	filename string,
+	criteria *string,
+) (*domain.StaticAsset, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	s.recordFilename(filename)
+	s.recordRequest(filename, criteria)
 	if err := integrationAssetError(filename); err != nil {
 		return nil, err
 	}
@@ -56,10 +60,19 @@ func integrationBackendError(filename string) error {
 	return nil
 }
 
-func (s *routerAssetService) recordFilename(filename string) {
+func (s *routerAssetService) recordRequest(filename string, criteria *string) {
 	s.mu.Lock()
 	s.filenames = append(s.filenames, filename)
+	s.criteria = append(s.criteria, cloneCriteria(criteria))
 	s.mu.Unlock()
+}
+
+func cloneCriteria(criteria *string) *string {
+	if criteria != nil {
+		cloned := *criteria
+		return &cloned
+	}
+	return nil
 }
 
 func (s *routerAssetService) newAsset() *domain.StaticAsset {
@@ -87,14 +100,9 @@ func (s *routerAssetService) snapshot() (*integrationBody, []string) {
 	return body, filenames
 }
 
-type integrationBody struct {
-	reader io.Reader
-	closed chan struct{}
-	once   sync.Once
-}
-
-func (b *integrationBody) Read(p []byte) (int, error) { return b.reader.Read(p) }
-func (b *integrationBody) Close() error {
-	b.once.Do(func() { close(b.closed) })
-	return nil
+func (s *routerAssetService) criteriaSnapshot() []*string {
+	s.mu.Lock()
+	criteria := append([]*string(nil), s.criteria...)
+	s.mu.Unlock()
+	return criteria
 }

@@ -13,8 +13,14 @@ import (
 var (
 	ErrAssetNotFound        = errors.New("asset not found")
 	ErrAssetAccessDenied    = errors.New("asset access denied")
+	ErrInvalidAssetCriteria = errors.New("invalid asset criteria")
+	ErrAmbiguousAssetMatch  = errors.New("asset match is ambiguous")
 	ErrInvalidAssetMetadata = errors.New("invalid asset metadata")
 )
+
+// AssetCriteria is an exact JSON object matched against an asset's tags.
+// Nested objects use map[string]any, arrays use []any, and numbers use json.Number.
+type AssetCriteria map[string]any
 
 // AssetDocument is the metadata stored in the MongoDB assets collection.
 type AssetDocument struct {
@@ -32,10 +38,10 @@ type StaticAsset struct {
 	ContentLength int64
 }
 
-// AssetRepository looks up asset metadata by its exact filename.
+// AssetRepository looks up asset metadata by its exact filename and optional tags.
 type AssetRepository interface {
-	// FindAsset resolves metadata by the exact stored filename.
-	FindAsset(context.Context, string) (*AssetDocument, error)
+	// FindAsset resolves metadata by the exact stored filename and optional exact tags.
+	FindAsset(context.Context, string, *AssetCriteria) (*AssetDocument, error)
 }
 
 // ObjectStorage retrieves object streams and metadata from cloud storage.
@@ -44,8 +50,8 @@ type ObjectStorage interface {
 	GetObject(context.Context, storage.GetObjectInput) (*storage.GetObjectOutput, error)
 }
 
-// AssetService retrieves an allowed asset by filename.
+// AssetService retrieves an allowed asset by filename and optional JSON criteria.
 type AssetService interface {
 	// GetAsset retrieves an asset after applying the access policy.
-	GetAsset(context.Context, string) (*StaticAsset, error)
+	GetAsset(context.Context, string, *string) (*StaticAsset, error)
 }

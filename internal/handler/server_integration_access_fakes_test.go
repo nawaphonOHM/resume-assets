@@ -18,9 +18,13 @@ type accessPolicyRepository struct {
 func (r *accessPolicyRepository) FindAsset(
 	ctx context.Context,
 	filename string,
+	criteria *domain.AssetCriteria,
 ) (*domain.AssetDocument, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+	if criteria != nil {
+		return nil, domain.ErrAssetNotFound
 	}
 	return r.records[filename], nil
 }

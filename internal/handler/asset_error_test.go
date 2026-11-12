@@ -20,6 +20,8 @@ func TestServeAssetMapsErrorsAndPropagatesContext(t *testing.T) {
 	tests := []handlerErrorCase{
 		{status: http.StatusNotFound, err: domain.ErrAssetNotFound, name: "missing"},
 		{status: http.StatusForbidden, err: domain.ErrAssetAccessDenied, name: "denied"},
+		{status: http.StatusBadRequest, err: domain.ErrInvalidAssetCriteria, name: "invalid criteria"},
+		{status: http.StatusConflict, err: domain.ErrAmbiguousAssetMatch, name: "ambiguous match"},
 		{status: http.StatusInternalServerError, err: errors.New("private backend detail"), name: "backend failure"},
 	}
 	for _, test := range tests {

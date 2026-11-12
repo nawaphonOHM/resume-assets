@@ -4,6 +4,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/nawaphonOHM/resume-assets/internal/domain"
@@ -12,11 +13,13 @@ import (
 )
 
 const (
-	codeAssetNotFound  = "ASSET_NOT_FOUND"
-	codeAccessDenied   = "ASSET_ACCESS_DENIED"
-	codeInvalidName    = "INVALID_ASSET_FILENAME"
-	codeInternalError  = "INTERNAL_SERVER_ERROR"
-	codeServiceOffline = "SERVICE_UNAVAILABLE"
+	codeAssetNotFound   = "ASSET_NOT_FOUND"
+	codeAccessDenied    = "ASSET_ACCESS_DENIED"
+	codeInvalidName     = "INVALID_ASSET_FILENAME"
+	codeInvalidCriteria = "INVALID_ASSET_CRITERIA"
+	codeAmbiguousAsset  = "AMBIGUOUS_ASSET_MATCH"
+	codeInternalError   = "INTERNAL_SERVER_ERROR"
+	codeServiceOffline  = "SERVICE_UNAVAILABLE"
 )
 
 // AssetHandler serves asset requests through the application service.
@@ -43,18 +46,26 @@ func (h *AssetHandler) isConfigured() bool {
 
 func (h *AssetHandler) serveRequest(c rest.Context) rest.Response {
 	ctx := requestContext(c)
-	filename := ""
-	if c != nil {
-		filename = c.Param("filename")
-	}
+	filename := requestFilename(c)
 	if !validFilename(filename) {
 		return rest.BadRequest(codeInvalidName, "filename must be a single path segment")
 	}
-	return h.retrieveAsset(ctx, filename)
+	criteria, err := requestAssetCriteria(c)
+	if err != nil {
+		return rest.BadRequest(codeInvalidCriteria, "asset criteria must be one URL-encoded JSON object")
+	}
+	return h.retrieveAsset(ctx, filename, criteria)
 }
 
-func (h *AssetHandler) retrieveAsset(ctx context.Context, filename string) rest.Response {
-	asset, err := h.assetService.GetAsset(ctx, filename)
+func requestFilename(c rest.Context) string {
+	if c == nil {
+		return ""
+	}
+	return c.Param("filename")
+}
+
+func (h *AssetHandler) retrieveAsset(ctx context.Context, filename string, criteria *string) rest.Response {
+	asset, err := h.assetService.GetAsset(ctx, filename, criteria)
 	if err != nil {
 		return mapAssetError(ctx, err)
 	}
@@ -85,6 +96,16 @@ func requestContext(c rest.Context) context.Context {
 }
 
 func mapAssetError(ctx context.Context, err error) rest.Response {
+	if errors.Is(err, domain.ErrInvalidAssetCriteria) {
+		return rest.BadRequest(codeInvalidCriteria, "asset criteria must be one valid JSON object")
+	}
+	if errors.Is(err, domain.ErrAmbiguousAssetMatch) {
+		return rest.Error(http.StatusConflict, codeAmbiguousAsset, "the filename and criteria match multiple assets")
+	}
+	return mapAssetLookupError(ctx, err)
+}
+
+func mapAssetLookupError(ctx context.Context, err error) rest.Response {
 	if errors.Is(err, domain.ErrAssetNotFound) {
 		return rest.NotFound(codeAssetNotFound, "the requested asset was not found")
 	}
