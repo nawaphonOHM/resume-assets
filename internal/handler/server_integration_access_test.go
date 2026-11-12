@@ -13,6 +13,7 @@ func TestFrameworkAssetAccessPolicy(t *testing.T) {
 	client, baseURL := startAccessPolicyServer(t, repository, storageClient)
 	assertPolicyAssetResponse(t, client, baseURL)
 	assertPolicyDeniedResponse(t, client, baseURL)
+	assertPolicyMissingTagsResponse(t, client, baseURL)
 	assertAccessPolicyStorageCalls(t, storageClient)
 }
 
@@ -44,5 +45,15 @@ func assertPolicyDeniedResponse(t *testing.T, client *http.Client, baseURL strin
 	response, _ := performRequest(t, client, http.MethodGet, baseURL+"/assets/"+integrationDeniedFilename)
 	if response.StatusCode != http.StatusForbidden {
 		t.Fatalf("DENY response: got status %d, want %d", response.StatusCode, http.StatusForbidden)
+	}
+}
+
+func assertPolicyMissingTagsResponse(t *testing.T, client *http.Client, baseURL string) {
+	t.Helper()
+	response, _ := performRequest(
+		t, client, http.MethodGet, baseURL+`/assets/app.js?%7B%22status%22%3A%22available%22%7D`,
+	)
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("missing tags response: got status %d, want %d", response.StatusCode, http.StatusNotFound)
 	}
 }

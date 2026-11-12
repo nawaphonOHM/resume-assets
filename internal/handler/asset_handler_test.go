@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	handlerTestFilename      = "app.js"
-	handlerTestContentLength = 12
+	handlerTestFilename          = "app.js"
+	handlerTestContentLength     = 12
+	handlerTestAvailableCriteria = `{"status":"available"}`
 )
 
 func TestServeAssetValidatesFilename(t *testing.T) {
@@ -45,6 +46,22 @@ func TestServeAssetReturnsStream(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", response.StatusCode())
 	}
 	assertHandlerServiceCall(t, service, handlerTestFilename)
+	if service.call.criteria != nil {
+		t.Fatalf("expected absent criteria, got %q", *service.call.criteria)
+	}
+}
+
+func TestServeAssetRejectsQueryBindingErrors(t *testing.T) {
+	ctx := newHandlerTestContext(context.Background(), handlerTestFilename)
+	ctx.request.queryBindErr = context.Canceled
+	service := &assetServiceFake{}
+	response := NewAssetHandler(service).ServeAsset(ctx)
+	if response.StatusCode() != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", response.StatusCode())
+	}
+	if service.calls != 0 {
+		t.Fatalf("query binding error reached service %d times", service.calls)
+	}
 }
 
 func assertHandlerServiceCall(t *testing.T, service *assetServiceFake, filename string) {

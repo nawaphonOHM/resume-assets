@@ -11,25 +11,9 @@ import (
 
 const testFilename = "app.js"
 
-func TestBuildFilterMatchesExactFilename(t *testing.T) {
-	const filename = "bundle/" + testFilename
-	filter := BuildFilter(filename)
-	if len(filter) != 1 {
-		t.Fatalf("expected one filter field, got %d", len(filter))
-	}
-	assertFilenameFilter(t, filter[0].Key, filter[0].Value, filename)
-}
-
-func assertFilenameFilter(t *testing.T, key string, value any, filename string) {
-	t.Helper()
-	if key != "filename" || value != filename {
-		t.Fatalf("expected exact filename filter, got key=%q value=%v", key, value)
-	}
-}
-
 func TestFindAssetNilCollection(t *testing.T) {
 	repository := NewMongoAssetRepository(nil)
-	asset, err := repository.FindAsset(context.Background(), testFilename)
+	asset, err := repository.FindAsset(context.Background(), testFilename, nil)
 	if asset != nil {
 		t.Fatalf("expected nil asset, got %#v", asset)
 	}

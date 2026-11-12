@@ -65,7 +65,7 @@ func runPolicyCase(t *testing.T, test policyCase, filename string) {
 	storageClient := &storageFake{}
 	service := newServiceForTest(t, repository, storageClient)
 
-	asset, err := service.FindAllowedAsset(ctx, filename)
+	asset, err := service.FindAllowedAsset(ctx, filename, nil)
 	assertPolicyError(t, err, test.wantErr)
 	assertPolicyAsset(t, asset, test.document, test.wantErr)
 	assertRepositoryCall(ctx, t, repository.call, filename)
