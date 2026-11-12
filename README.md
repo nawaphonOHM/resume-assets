@@ -32,7 +32,7 @@ The server reads the fixed MongoDB collection named `assets`. Documents use this
 
 ### Asset lookup criteria
 
-`GET /assets/{filename}` accepts the URL-encoded JSON object used by `query_test.sh` as the entire query string, rather than as a named parameter. For example, the following selects the asset whose complete `tags` object is `{"status":"available"}`:
+`GET /assets/{filename}` accepts a URL-encoded JSON object as the entire query string, rather than as a named parameter. For example, the following selects the asset whose complete `tags` object is `{"status":"available"}`:
 
 ```text
 GET /assets/app.js?%7B%22status%22%3A%22available%22%7D
