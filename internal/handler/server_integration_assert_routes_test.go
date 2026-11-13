@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-const integrationExpectedLookups = 9
+const integrationExpectedLookups = 10
 
 type integrationRouteCase struct {
 	method string
@@ -38,6 +38,9 @@ func assertIntegrationRoute(t *testing.T, client *http.Client, baseURL string, t
 	t.Helper()
 	response, body := performRequest(t, client, test.method, baseURL+test.path)
 	assertIntegrationRouteStatus(t, response, body, test)
+	if test.status != http.StatusOK {
+		assertAssetMetadataOmittedOnError(t, response, test)
+	}
 	assertIntegrationHeadRoute(t, response, body, test)
 	assertIntegrationPrivateDetail(t, test, body)
 }
@@ -63,22 +66,24 @@ func assertIntegrationHeadRoute(t *testing.T, response *http.Response, body stri
 	assertHeadMetadataOmittedOnError(t, response, test)
 }
 
-func assertHeadMetadataOmittedOnError(t *testing.T, response *http.Response, test integrationRouteCase) {
+func assertAssetMetadataOmittedOnError(t *testing.T, response *http.Response, test integrationRouteCase) {
 	t.Helper()
-	if test.status == http.StatusOK {
-		return
-	}
-	for _, name := range []string{"ETag", "Last-Modified", "Content-Type", "Content-Length", "X-Head-Mode"} {
-		assertHeadErrorHeaderOmitted(t, response, test, name)
+	for _, name := range []string{handlerETagHeader, integrationHeaderLastModified, integrationHeaderMode} {
+		assertAssetMetadataHeaderOmitted(t, response, test, name)
 	}
 }
 
-func assertHeadErrorHeaderOmitted(t *testing.T, response *http.Response, test integrationRouteCase, name string) {
+func assertAssetMetadataHeaderOmitted(
+	t *testing.T,
+	response *http.Response,
+	test integrationRouteCase,
+	name string,
+) {
 	t.Helper()
-	if response.Header.Get(name) != "" {
+	if got := response.Header.Get(name); got != "" {
 		t.Errorf(
-			"HEAD error %s included asset metadata header %s=%q",
-			test.path, name, response.Header.Get(name),
+			"%s error %s included asset metadata header %s=%q",
+			test.method, test.path, name, got,
 		)
 	}
 }

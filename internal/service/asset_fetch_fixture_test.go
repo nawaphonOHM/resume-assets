@@ -27,13 +27,17 @@ func newStorageFixture(body *closeTracker, fixedTime time.Time) *storageFake {
 	}}
 }
 
-func getAssetForTest(ctx context.Context, t *testing.T, service *AssetService) *domain.StaticAsset {
+func getAssetForTest(
+	ctx context.Context,
+	t *testing.T,
+	service *AssetService,
+) (*domain.StaticAsset, *domain.AssetDocument) {
 	t.Helper()
-	asset, err := service.GetAsset(ctx, testAssetFilename, nil)
+	asset, document, err := service.GetAsset(ctx, testAssetFilename, nil)
 	if err != nil {
 		t.Fatalf("GetAsset: %v", err)
 	}
-	return asset
+	return asset, document
 }
 
 func assertStreamOutput(t *testing.T, asset *domain.StaticAsset, body *closeTracker, fixedTime time.Time) {

@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
-	"time"
 )
 
 func assertIntegrationAsset(t *testing.T, client *http.Client, baseURL string, service *routerAssetService) {
@@ -13,8 +12,30 @@ func assertIntegrationAsset(t *testing.T, client *http.Client, baseURL string, s
 	if response.StatusCode != http.StatusOK || body != integrationAssetData {
 		t.Fatalf("successful asset response: status=%d body=%q", response.StatusCode, body)
 	}
-	assertIntegrationHeaders(t, response.Header)
-	assertIntegrationBodyAndLookup(t, service)
+	assertIntegrationGetHeaders(t, response.Header, []integrationHeader{
+		{name: integrationHeaderContentType, value: integrationContentType},
+		{name: handlerContentLengthHeader, value: strconv.Itoa(len(integrationAssetData))},
+		{name: handlerETagHeader, value: integrationMetadataETag},
+		{name: integrationHeaderLastModified, value: "Fri, 02 Jan 2026 03:04:05 GMT"},
+		{name: integrationHeaderMode, value: "cache"},
+	})
+	assertIntegrationBodyAndLookup(t, service, "app.js")
+}
+
+func assertIntegrationPDFAsset(t *testing.T, client *http.Client, baseURL string, service *routerAssetService) {
+	t.Helper()
+	response, body := performRequest(t, client, http.MethodGet, baseURL+"/assets/app.PDF")
+	if response.StatusCode != http.StatusOK || body != integrationAssetData {
+		t.Fatalf("successful PDF asset response: status=%d body=%q", response.StatusCode, body)
+	}
+	assertIntegrationGetHeaders(t, response.Header, []integrationHeader{
+		{name: integrationHeaderContentType, value: integrationPDFContentType},
+		{name: handlerContentLengthHeader, value: strconv.Itoa(len(integrationAssetData))},
+		{name: handlerETagHeader, value: integrationETag},
+		{name: integrationHeaderLastModified, value: "Fri, 02 Jan 2026 03:04:05 GMT"},
+		{name: integrationHeaderMode, value: "download"},
+	})
+	assertIntegrationBodyAndLookup(t, service, "app.js", "app.PDF")
 }
 
 func assertIntegrationHeadResponses(t *testing.T, client *http.Client, baseURL string) {
@@ -27,20 +48,20 @@ func assertCachingHeadResponse(t *testing.T, client *http.Client, baseURL string
 	t.Helper()
 	response, body := performRequest(t, client, http.MethodHead, baseURL+"/assets/app.js")
 	assertSuccessfulHeadResponse(t, response, body, "non-PDF")
-	assertHeadResponseHeader(t, response.Header, "ETag", integrationETag)
-	assertHeadResponseHeader(t, response.Header, "X-Head-Mode", "cache")
-	assertHeadResponseHeader(t, response.Header, "Content-Type", "")
-	assertHeadResponseHeader(t, response.Header, "Content-Length", "")
+	assertHeadResponseHeader(t, response.Header, handlerETagHeader, integrationMetadataETag)
+	assertHeadResponseHeader(t, response.Header, integrationHeaderMode, "cache")
+	assertHeadResponseHeader(t, response.Header, integrationHeaderContentType, "")
+	assertHeadResponseHeader(t, response.Header, handlerContentLengthHeader, "")
 }
 
 func assertDownloadingHeadResponse(t *testing.T, client *http.Client, baseURL string) {
 	t.Helper()
 	response, body := performRequest(t, client, http.MethodHead, baseURL+"/assets/app.PDF")
 	assertSuccessfulHeadResponse(t, response, body, "PDF")
-	assertHeadResponseHeader(t, response.Header, "ETag", "")
-	assertHeadResponseHeader(t, response.Header, "X-Head-Mode", "download")
-	assertHeadResponseHeader(t, response.Header, "Content-Type", integrationContentType)
-	assertHeadResponseHeader(t, response.Header, "Content-Length", strconv.Itoa(len(integrationAssetData)))
+	assertHeadResponseHeader(t, response.Header, handlerETagHeader, "")
+	assertHeadResponseHeader(t, response.Header, integrationHeaderMode, "download")
+	assertHeadResponseHeader(t, response.Header, integrationHeaderContentType, integrationPDFContentType)
+	assertHeadResponseHeader(t, response.Header, handlerContentLengthHeader, strconv.Itoa(len(integrationAssetData)))
 }
 
 func assertSuccessfulHeadResponse(t *testing.T, response *http.Response, body, assetType string) {
@@ -57,43 +78,16 @@ func assertHeadResponseHeader(t *testing.T, headers http.Header, name, want stri
 	}
 }
 
-func assertIntegrationHeaders(t *testing.T, headers http.Header) {
+type integrationHeader struct {
+	name  string
+	value string
+}
+
+func assertIntegrationGetHeaders(t *testing.T, headers http.Header, expected []integrationHeader) {
 	t.Helper()
-	expected := []struct{ name, value string }{
-		{name: "Content-Type", value: integrationContentType},
-		{name: "Content-Length", value: strconv.Itoa(len(integrationAssetData))},
-		{name: "ETag", value: integrationETag},
-		{name: "Last-Modified", value: "Fri, 02 Jan 2026 03:04:05 GMT"},
-	}
 	for _, header := range expected {
 		if headers.Get(header.name) != header.value {
 			t.Errorf("asset metadata header %s: got %q, want %q", header.name, headers.Get(header.name), header.value)
 		}
-	}
-}
-
-func assertIntegrationBodyAndLookup(t *testing.T, service *routerAssetService) {
-	t.Helper()
-	body, filenames := service.snapshot()
-	if body == nil {
-		t.Fatal("framework stream did not produce an object body")
-	}
-	assertIntegrationBodyClosed(t, body)
-	assertIntegrationFirstLookup(t, filenames)
-}
-
-func assertIntegrationFirstLookup(t *testing.T, filenames []string) {
-	t.Helper()
-	if len(filenames) != 1 || filenames[0] != "app.js" {
-		t.Fatalf("unexpected service lookup: %#v", filenames)
-	}
-}
-
-func assertIntegrationBodyClosed(t *testing.T, body *integrationBody) {
-	t.Helper()
-	select {
-	case <-body.closed:
-	case <-time.After(integrationWaitTimeout):
-		t.Fatal("framework stream did not close the object body")
 	}
 }

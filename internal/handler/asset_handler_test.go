@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"testing"
 
@@ -35,12 +36,15 @@ func assertInvalidFilename(t *testing.T, filename string) {
 }
 
 func TestServeAssetReturnsStream(t *testing.T) {
-	service := &assetServiceFake{asset: &domain.StaticAsset{
-		Body:          handlerBody{},
-		ContentType:   "application/javascript",
-		ContentLength: handlerTestContentLength,
-		ETag:          "asset-tag",
-	}}
+	service := &assetServiceFake{
+		asset: &domain.StaticAsset{
+			Body:          handlerBody{},
+			ContentType:   "application/javascript",
+			ContentLength: handlerTestContentLength,
+			ETag:          "asset-tag",
+		},
+		document: &domain.AssetDocument{},
+	}
 	response := NewAssetHandler(service).ServeAsset(newHandlerTestContext(context.Background(), handlerTestFilename))
 	if response.StatusCode() != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", response.StatusCode())
@@ -48,6 +52,18 @@ func TestServeAssetReturnsStream(t *testing.T) {
 	assertHandlerServiceCall(t, service, handlerTestFilename)
 	if service.call.criteria != nil {
 		t.Fatalf("expected absent criteria, got %q", *service.call.criteria)
+	}
+}
+
+func TestServeAssetClosesStreamWhenDocumentIsMissing(t *testing.T) {
+	body := &trackedHandlerBody{}
+	service := &assetServiceFake{asset: &domain.StaticAsset{Body: body}}
+	response := NewAssetHandler(service).ServeAsset(newHandlerTestContext(context.Background(), handlerTestFilename))
+	if response.StatusCode() != http.StatusInternalServerError {
+		t.Fatalf("expected status 500 for missing metadata document, got %d", response.StatusCode())
+	}
+	if !body.closed {
+		t.Fatal("asset stream was not closed after missing metadata document")
 	}
 }
 
@@ -84,4 +100,15 @@ func assertHandlerFilename(t *testing.T, call *handlerServiceCall, filename stri
 
 func newHandlerTestContext(ctx context.Context, filename string) *handlerTestContext {
 	return &handlerTestContext{request: &handlerTestRequest{filename: filename, ctx: ctx}}
+}
+
+type trackedHandlerBody struct {
+	closed bool
+}
+
+func (*trackedHandlerBody) Read([]byte) (int, error) { return 0, io.EOF }
+
+func (b *trackedHandlerBody) Close() error {
+	b.closed = true
+	return nil
 }

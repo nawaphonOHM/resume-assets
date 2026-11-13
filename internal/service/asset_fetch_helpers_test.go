@@ -44,6 +44,13 @@ func assertStaticAsset(t *testing.T, asset *domain.StaticAsset, expected domain.
 	}
 }
 
+func assertNoAssetDocument(t *testing.T, document *domain.AssetDocument) {
+	t.Helper()
+	if document != nil {
+		t.Fatalf("expected nil asset document, got %#v", document)
+	}
+}
+
 func closeAssetBody(t *testing.T, body io.ReadCloser) {
 	t.Helper()
 	if err := body.Close(); err != nil {

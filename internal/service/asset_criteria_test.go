@@ -68,19 +68,4 @@ func TestParseAssetCriteriaRejectsInvalidInput(t *testing.T) {
 	}
 }
 
-func TestGetAssetRejectsInvalidCriteriaBeforeLookupOrStorage(t *testing.T) {
-	repository := &repositoryFake{}
-	storageClient := &storageFake{}
-	assetService := newServiceForTest(t, repository, storageClient)
-	criteriaJSON := `[]`
-
-	asset, err := assetService.GetAsset(t.Context(), testAssetFilename, &criteriaJSON)
-	assertNoStaticAsset(t, asset)
-	assertAssetError(t, err, domain.ErrInvalidAssetCriteria)
-	if repository.call != nil {
-		t.Fatalf("invalid criteria reached repository: %#v", repository.call)
-	}
-	assertStorageNotCalled(t, storageClient)
-}
-
 func stringPointer(value string) *string { return &value }

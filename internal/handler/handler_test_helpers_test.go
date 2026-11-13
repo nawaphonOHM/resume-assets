@@ -92,10 +92,10 @@ func (s *assetServiceFake) GetAsset(
 	ctx context.Context,
 	filename string,
 	criteria *string,
-) (*domain.StaticAsset, error) {
+) (*domain.StaticAsset, *domain.AssetDocument, error) {
 	s.calls++
 	s.call = &handlerServiceCall{ctx: ctx, filename: filename, criteria: criteria}
-	return s.asset, s.err
+	return s.asset, s.document, s.err
 }
 
 type handlerBody struct{}

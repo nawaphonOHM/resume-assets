@@ -50,25 +50,6 @@ func (h *AssetHandler) ServeAssetHead(c rest.Context) rest.Response {
 	return h.serveHeadRequest(request)
 }
 
-func (h *AssetHandler) serveHeadRequest(request assetRequest) rest.Response {
-	asset, err := h.assetService.FindAllowedAsset(request.ctx, request.filename, request.criteria)
-	if err != nil {
-		return bodylessResponse(mapAssetError(request.ctx, err).StatusCode())
-	}
-	return headAssetResponse(request.ctx, request.filename, asset)
-}
-
-func headAssetResponse(ctx context.Context, filename string, asset *domain.AssetDocument) rest.Response {
-	if asset == nil {
-		logging.ErrorContext(ctx, "asset service returned an empty metadata document")
-		return bodylessResponse(http.StatusInternalServerError)
-	}
-	if asset.Access != "ALLOW" {
-		return bodylessResponse(http.StatusForbidden)
-	}
-	return buildHeadAssetResponse(filename, asset)
-}
-
 func (h *AssetHandler) isConfigured() bool {
 	return h != nil && h.assetService != nil
 }
@@ -82,17 +63,27 @@ func (h *AssetHandler) serveRequest(c rest.Context) rest.Response {
 }
 
 func (h *AssetHandler) retrieveAsset(ctx context.Context, filename string, criteria *string) rest.Response {
-	asset, err := h.assetService.GetAsset(ctx, filename, criteria)
+	asset, document, err := h.assetService.GetAsset(ctx, filename, criteria)
 	if err != nil {
 		return mapAssetError(ctx, err)
+	}
+	return retrievedAssetResponse(ctx, filename, asset, document)
+}
+
+func retrievedAssetResponse(
+	ctx context.Context,
+	filename string,
+	asset *domain.StaticAsset,
+	document *domain.AssetDocument,
+) rest.Response {
+	if document == nil {
+		closeAssetStream(ctx, asset)
+		logging.ErrorContext(ctx, "asset service returned an empty metadata document")
+		return rest.InternalServerError(codeInternalError, "the server failed to serve the requested asset")
 	}
 	if !hasAssetBody(asset) {
 		logging.ErrorContext(ctx, "asset service returned an empty stream")
 		return rest.InternalServerError(codeInternalError, "the server failed to serve the requested asset")
 	}
-	return buildAssetResponse(asset)
-}
-
-func hasAssetBody(asset *domain.StaticAsset) bool {
-	return asset != nil && asset.Body != nil
+	return buildAssetResponse(ctx, filename, asset, document)
 }
