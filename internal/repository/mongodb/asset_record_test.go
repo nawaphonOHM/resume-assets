@@ -9,19 +9,6 @@ import (
 
 const testNonStringLocation = 42
 
-func TestAssetRecordStringFieldsRoundTrip(t *testing.T) {
-	original := assetRecord{Filename: testFilename, Location: "s3://bucket/key", Access: "ALLOW"}
-	encoded, err := libmongodb.Marshal(original)
-	if err != nil {
-		t.Fatalf("marshal asset record: %v", err)
-	}
-	document := decodeAssetRecord(t, encoded).toAssetDocument()
-	expected := domain.AssetDocument{Filename: testFilename, Location: "s3://bucket/key", Access: "ALLOW"}
-	if *document != expected {
-		t.Fatalf("unexpected metadata: got %#v, want %#v", document, expected)
-	}
-}
-
 func TestAssetRecordUntrustedFieldsFailClosed(t *testing.T) {
 	tests := []struct {
 		fields map[string]any

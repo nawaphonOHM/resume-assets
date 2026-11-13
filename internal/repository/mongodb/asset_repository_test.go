@@ -3,6 +3,7 @@ package mongodb
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/nawaphonOHM/resume-assets/internal/domain"
@@ -44,13 +45,17 @@ func TestAssetDocumentBSON(t *testing.T) {
 		Filename: testFilename,
 		Location: "s3://assets-bucket/app.js",
 		Access:   "ALLOW",
+		Metadata: domain.AssetMetadata{
+			ForCaching:     map[string]any{"ETag": "tag"},
+			ForDownloading: map[string]any{"Content-Length": int64(assetMetadataLength)},
+		},
 	}
 	data, err := libmongodb.Marshal(asset)
 	if err != nil {
 		t.Fatalf("marshal asset document: %v", err)
 	}
 	decoded := decodeAssetDocument(t, data)
-	if decoded != asset {
+	if !reflect.DeepEqual(decoded, asset) {
 		t.Fatalf("round-trip mismatch: got %#v, want %#v", decoded, asset)
 	}
 }

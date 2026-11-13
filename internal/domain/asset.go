@@ -24,9 +24,16 @@ type AssetCriteria map[string]any
 
 // AssetDocument is the metadata stored in the MongoDB assets collection.
 type AssetDocument struct {
-	Filename string `bson:"filename"`
-	Location string `bson:"location"`
-	Access   string `bson:"access"`
+	Metadata AssetMetadata `bson:"metaData"`
+	Filename string        `bson:"filename"`
+	Location string        `bson:"location"`
+	Access   string        `bson:"access"`
+}
+
+// AssetMetadata contains optional response headers stored with an asset.
+type AssetMetadata struct {
+	ForCaching     map[string]any `bson:"forCaching"`
+	ForDownloading map[string]any `bson:"forDownloading"`
 }
 
 // StaticAsset contains a streamed object and the metadata needed for its response.
@@ -52,6 +59,9 @@ type ObjectStorage interface {
 
 // AssetService retrieves an allowed asset by filename and optional JSON criteria.
 type AssetService interface {
+	// FindAllowedAsset looks up an allowed asset without retrieving its object.
+	FindAllowedAsset(context.Context, string, *string) (*AssetDocument, error)
+
 	// GetAsset retrieves an asset after applying the access policy.
 	GetAsset(context.Context, string, *string) (*StaticAsset, error)
 }

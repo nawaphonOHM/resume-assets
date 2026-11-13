@@ -71,10 +71,21 @@ type handlerServiceCall struct {
 }
 
 type assetServiceFake struct {
-	err   error
-	call  *handlerServiceCall
-	asset *domain.StaticAsset
-	calls int
+	err      error
+	call     *handlerServiceCall
+	asset    *domain.StaticAsset
+	document *domain.AssetDocument
+	calls    int
+}
+
+func (s *assetServiceFake) FindAllowedAsset(
+	ctx context.Context,
+	filename string,
+	criteria *string,
+) (*domain.AssetDocument, error) {
+	s.calls++
+	s.call = &handlerServiceCall{ctx: ctx, filename: filename, criteria: criteria}
+	return s.document, s.err
 }
 
 func (s *assetServiceFake) GetAsset(

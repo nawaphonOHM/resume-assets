@@ -2,10 +2,7 @@ package handler
 
 import (
 	"context"
-	"errors"
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/nawaphonOHM/resume-assets/internal/domain"
 )
@@ -28,6 +25,35 @@ type routerAssetService struct {
 	mu        sync.Mutex
 }
 
+func (s *routerAssetService) FindAllowedAsset(
+	ctx context.Context,
+	filename string,
+	criteria *string,
+) (*domain.AssetDocument, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	s.recordRequest(filename, criteria)
+	if err := integrationAssetError(filename); err != nil {
+		return nil, err
+	}
+	return &domain.AssetDocument{
+		Filename: filename,
+		Access:   "ALLOW",
+		Metadata: domain.AssetMetadata{
+			ForCaching: map[string]any{
+				"ETag":        integrationETag,
+				"X-Head-Mode": "cache",
+			},
+			ForDownloading: map[string]any{
+				"Content-Length": int32(len(integrationAssetData)),
+				"Content-Type":   integrationContentType,
+				"X-Head-Mode":    "download",
+			},
+		},
+	}, nil
+}
+
 func (s *routerAssetService) GetAsset(
 	ctx context.Context,
 	filename string,
@@ -43,23 +69,6 @@ func (s *routerAssetService) GetAsset(
 	return s.newAsset(), nil
 }
 
-func integrationAssetError(filename string) error {
-	if filename == "missing" {
-		return domain.ErrAssetNotFound
-	}
-	if filename == "denied" {
-		return domain.ErrAssetAccessDenied
-	}
-	return integrationBackendError(filename)
-}
-
-func integrationBackendError(filename string) error {
-	if filename == "broken" {
-		return errors.New(integrationPrivateDetail)
-	}
-	return nil
-}
-
 func (s *routerAssetService) recordRequest(filename string, criteria *string) {
 	s.mu.Lock()
 	s.filenames = append(s.filenames, filename)
@@ -73,36 +82,4 @@ func cloneCriteria(criteria *string) *string {
 		return &cloned
 	}
 	return nil
-}
-
-func (s *routerAssetService) newAsset() *domain.StaticAsset {
-	body := &integrationBody{reader: strings.NewReader(integrationAssetData), closed: make(chan struct{})}
-	s.mu.Lock()
-	s.body = body
-	s.mu.Unlock()
-	return &domain.StaticAsset{
-		Body:          body,
-		ContentType:   integrationContentType,
-		ContentLength: int64(len(integrationAssetData)),
-		ETag:          integrationETag,
-		LastModified: time.Date(
-			integrationAssetYear, time.January, 2, integrationAssetHour, integrationAssetMinute,
-			integrationAssetSecond, 0, time.UTC,
-		),
-	}
-}
-
-func (s *routerAssetService) snapshot() (*integrationBody, []string) {
-	s.mu.Lock()
-	body := s.body
-	filenames := append([]string(nil), s.filenames...)
-	s.mu.Unlock()
-	return body, filenames
-}
-
-func (s *routerAssetService) criteriaSnapshot() []*string {
-	s.mu.Lock()
-	criteria := append([]*string(nil), s.criteria...)
-	s.mu.Unlock()
-	return criteria
 }

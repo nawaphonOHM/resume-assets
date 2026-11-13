@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/nawaphonOHM/resume-assets/internal/domain"
@@ -43,7 +44,7 @@ func assertSelectedAssetRecord(t *testing.T, asset *domain.AssetDocument) {
 		t.Fatal("expected selected asset")
 	}
 	want := domain.AssetDocument{Filename: testFilename, Location: "s3://assets/app.js", Access: "ALLOW"}
-	if *asset != want {
+	if !reflect.DeepEqual(*asset, want) {
 		t.Fatalf("selected asset = %#v, want %#v", asset, want)
 	}
 }

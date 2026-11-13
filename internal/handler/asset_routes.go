@@ -13,11 +13,18 @@ func NewAPIRegistration(handler *AssetHandler) *rest.RRestAPIRegistration {
 		Group:   rest.APIGroupRaw,
 	}
 	if handler != nil {
-		registration.Apis = []*rest.ExportableAPI{{
-			Method:  rest.GET,
-			Path:    RouteAssetPath,
-			Handler: handler.ServeAsset,
-		}}
+		registration.Apis = []*rest.ExportableAPI{
+			{
+				Method:  rest.GET,
+				Path:    RouteAssetPath,
+				Handler: handler.ServeAsset,
+			},
+			{
+				Method:  rest.HEAD,
+				Path:    RouteAssetPath,
+				Handler: handler.ServeAssetHead,
+			},
+		}
 	}
 	return registration
 }
