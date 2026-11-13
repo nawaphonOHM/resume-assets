@@ -75,12 +75,16 @@ func (s *AssetService) GetAsset(
 	ctx context.Context,
 	filename string,
 	criteriaJSON *string,
-) (*domain.StaticAsset, error) {
+) (*domain.StaticAsset, *domain.AssetDocument, error) {
 	document, err := s.FindAllowedAsset(ctx, filename, criteriaJSON)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return s.fetchAsset(ctx, document.Location)
+	asset, err := s.fetchAsset(ctx, document.Location)
+	if err != nil {
+		return nil, nil, err
+	}
+	return asset, document, nil
 }
 
 func (s *AssetService) fetchAsset(ctx context.Context, location string) (*domain.StaticAsset, error) {

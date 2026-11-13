@@ -77,7 +77,13 @@ Use the actual unique index name shown by `getIndexes()` if it differs, and coor
 
 For an authorized asset, `HEAD` selects `metaData.forDownloading` when the filename extension is `.pdf` (case-insensitive), and `metaData.forCaching` for all other filenames. The selected object is a map of HTTP header names to string or integer values; integer values are sent as decimal strings. Unsupported values and unsafe or invalid headers are omitted. An absent or malformed header map does not prevent an authorized `HEAD` from returning `200`, but lookup errors do not include asset metadata headers. `HEAD` returns no response body.
 
-`HEAD` performs only the MongoDB lookup and access check. It does not fetch or verify the object in storage, so it may return `200` from valid metadata even if the corresponding object is missing. `GET` remains storage-backed: it fetches and streams the object, forwarding available storage `Content-Type`, `Content-Length`, `ETag`, and HTTP-formatted `Last-Modified` metadata. A missing asset document returns `404`; a missing object or invalid metadata encountered during `GET` returns `404` or `500`, respectively. Internal backend error details are logged, not returned to clients.
+### GET metadata and storage headers
+
+`GET` uses the same filename-based selection and metadata validation as `HEAD`, then fetches and streams the authorized object. Available storage `Content-Type`, `Content-Length`, `ETag`, and HTTP-formatted `Last-Modified` headers are retained unless a valid selected MongoDB metadata header overrides them. Header names are compared case-insensitively, and each response header is applied once. Metadata string and integer values are supported; malformed, unsupported, unsafe, or invalid metadata headers are omitted without preventing a successful stream.
+
+Storage `Content-Length` is always authoritative when its value is known and nonnegative, including when it is zero. A metadata length is never used when storage length is unknown. Other metadata values win when they conflict with storage values. Conflicts produce a warning containing the filename, header name, and winning source, but not either header value; a metadata length ignored because storage length is unknown is also warned about.
+
+`HEAD` performs only the MongoDB lookup and access check. It does not fetch or verify the object in storage, so it can return metadata headers even if the corresponding object is missing; unlike `GET`, its `Content-Length` may therefore come from MongoDB. `GET` remains storage-backed and returns no asset metadata headers on errors. A missing asset document or object returns `404`; internal backend error details are logged, not returned to clients.
 
 ## Supported object locations
 
@@ -93,7 +99,7 @@ All locations are fetched through the configured S3-compatible storage client:
 
 Locations with unsupported schemes or without an object key are invalid. Leading slashes on plain keys are removed; nested object key names within `location` are supported even though nested HTTP routes are not.
 
-Successful responses stream the object and forward available `Content-Type`, `Content-Length`, `ETag`, and HTTP-formatted `Last-Modified` metadata.
+Successful `GET` responses stream the object and combine available storage headers with the selected, validated MongoDB metadata headers as described above.
 
 ## Configuration
 

@@ -63,5 +63,5 @@ type AssetService interface {
 	FindAllowedAsset(context.Context, string, *string) (*AssetDocument, error)
 
 	// GetAsset retrieves an asset after applying the access policy.
-	GetAsset(context.Context, string, *string) (*StaticAsset, error)
+	GetAsset(context.Context, string, *string) (*StaticAsset, *AssetDocument, error)
 }

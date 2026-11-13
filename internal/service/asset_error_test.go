@@ -61,8 +61,9 @@ func runAssetErrorCase(t *testing.T, test assetErrorCase) {
 	storageClient := &storageFake{output: test.output, err: test.storageErr}
 	assetService := newServiceForTest(t, repository, storageClient)
 
-	asset, err := assetService.GetAsset(t.Context(), testAssetFilename, nil)
+	asset, document, err := assetService.GetAsset(t.Context(), testAssetFilename, nil)
 	assertNoStaticAsset(t, asset)
+	assertNoAssetDocument(t, document)
 	assertAssetError(t, err, test.wantErr)
 	assertStorageCallCount(t, storageClient, test.wantCalls)
 	assertAdditionalError(t, err, test.extraErr)

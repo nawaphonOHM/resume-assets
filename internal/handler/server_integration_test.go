@@ -10,6 +10,7 @@ func TestFrameworkAssetRouter(t *testing.T) {
 	baseURL := startFrameworkServer(t, RegisterRoutes(NewAssetHandler(service)))
 	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}
 	assertIntegrationAsset(t, client, baseURL, service)
+	assertIntegrationPDFAsset(t, client, baseURL, service)
 	assertIntegrationHeadResponses(t, client, baseURL)
 	assertIntegrationRoutes(t, client, baseURL, service)
 	assertIntegrationProbes(t, client, baseURL)

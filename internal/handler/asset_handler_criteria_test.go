@@ -13,7 +13,10 @@ func TestServeAssetPassesScriptStyleQueryCriteria(t *testing.T) {
 	criteria := handlerTestAvailableCriteria
 	ctx := newHandlerTestContext(context.Background(), handlerTestFilename)
 	ctx.request.query = map[string][]string{criteria: {""}}
-	service := &assetServiceFake{asset: &domain.StaticAsset{Body: handlerBody{}}}
+	service := &assetServiceFake{
+		asset:    &domain.StaticAsset{Body: handlerBody{}},
+		document: &domain.AssetDocument{},
+	}
 	response := NewAssetHandler(service).ServeAsset(ctx)
 	assertAssetCriteriaRequest(t, response, service, criteria)
 }

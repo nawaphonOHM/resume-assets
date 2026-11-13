@@ -45,8 +45,9 @@ func runAccessGateCase(t *testing.T, test accessGateCase) {
 	repository := &repositoryFake{document: test.document, err: test.repoErr}
 	storageClient := &storageFake{}
 	assetService := newServiceForTest(t, repository, storageClient)
-	asset, err := assetService.GetAsset(t.Context(), testAssetFilename, nil)
+	asset, document, err := assetService.GetAsset(t.Context(), testAssetFilename, nil)
 	assertNoStaticAsset(t, asset)
+	assertNoAssetDocument(t, document)
 	assertPolicyError(t, err, test.wantErr)
 	assertStorageNotCalled(t, storageClient)
 }

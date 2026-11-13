@@ -28,6 +28,7 @@ type repositoryFake struct {
 	document *domain.AssetDocument
 	err      error
 	call     *repositoryCall
+	calls    int
 }
 
 func (r *repositoryFake) FindAsset(
@@ -35,6 +36,7 @@ func (r *repositoryFake) FindAsset(
 	filename string,
 	criteria *domain.AssetCriteria,
 ) (*domain.AssetDocument, error) {
+	r.calls++
 	r.call = &repositoryCall{ctx: ctx, filename: filename, criteria: criteria}
 	return r.document, r.err
 }

@@ -19,7 +19,7 @@ func TestGetAssetPropagatesCancellation(t *testing.T) {
 	}}
 	assetService := newServiceForTest(t, repository, storageClient)
 
-	if _, err := assetService.GetAsset(ctx, testAssetFilename, nil); !errors.Is(err, context.Canceled) {
+	if _, _, err := assetService.GetAsset(ctx, testAssetFilename, nil); !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected cancellation to propagate, got %v", err)
 	}
 	assertStorageContext(ctx, t, storageClient.call)
