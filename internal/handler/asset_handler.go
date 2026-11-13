@@ -3,9 +3,7 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/nawaphonOHM/resume-assets/internal/domain"
 	"github.com/nawaphonOHM/whatever/v3/pkg/logging"
@@ -40,28 +38,47 @@ func (h *AssetHandler) ServeAsset(c rest.Context) rest.Response {
 	return h.serveRequest(c)
 }
 
+// ServeAssetHead handles HEAD /assets/:filename without retrieving the object.
+func (h *AssetHandler) ServeAssetHead(c rest.Context) rest.Response {
+	if !h.isConfigured() {
+		return bodylessResponse(http.StatusInternalServerError)
+	}
+	request := parseAssetRequest(c)
+	if !request.valid {
+		return bodylessResponse(request.response.StatusCode())
+	}
+	return h.serveHeadRequest(request)
+}
+
+func (h *AssetHandler) serveHeadRequest(request assetRequest) rest.Response {
+	asset, err := h.assetService.FindAllowedAsset(request.ctx, request.filename, request.criteria)
+	if err != nil {
+		return bodylessResponse(mapAssetError(request.ctx, err).StatusCode())
+	}
+	return headAssetResponse(request.ctx, request.filename, asset)
+}
+
+func headAssetResponse(ctx context.Context, filename string, asset *domain.AssetDocument) rest.Response {
+	if asset == nil {
+		logging.ErrorContext(ctx, "asset service returned an empty metadata document")
+		return bodylessResponse(http.StatusInternalServerError)
+	}
+	if asset.Access != "ALLOW" {
+		return bodylessResponse(http.StatusForbidden)
+	}
+	return buildHeadAssetResponse(filename, asset)
+}
+
 func (h *AssetHandler) isConfigured() bool {
 	return h != nil && h.assetService != nil
 }
 
 func (h *AssetHandler) serveRequest(c rest.Context) rest.Response {
-	ctx := requestContext(c)
-	filename := requestFilename(c)
-	if !validFilename(filename) {
-		return rest.BadRequest(codeInvalidName, "filename must be a single path segment")
+	request := parseAssetRequest(c)
+	if !request.valid {
+		return request.response
 	}
-	criteria, err := requestAssetCriteria(c)
-	if err != nil {
-		return rest.BadRequest(codeInvalidCriteria, "asset criteria must be one URL-encoded JSON object")
-	}
-	return h.retrieveAsset(ctx, filename, criteria)
-}
-
-func requestFilename(c rest.Context) string {
-	if c == nil {
-		return ""
-	}
-	return c.Param("filename")
+	return h.retrieveAsset(request.ctx, request.filename, request.criteria)
 }
 
 func (h *AssetHandler) retrieveAsset(ctx context.Context, filename string, criteria *string) rest.Response {
@@ -78,40 +95,4 @@ func (h *AssetHandler) retrieveAsset(ctx context.Context, filename string, crite
 
 func hasAssetBody(asset *domain.StaticAsset) bool {
 	return asset != nil && asset.Body != nil
-}
-
-func validFilename(filename string) bool {
-	return filename != "" && !isDotSegment(filename) && !strings.ContainsAny(filename, "/\x00")
-}
-
-func isDotSegment(filename string) bool {
-	return filename == "." || filename == ".."
-}
-
-func requestContext(c rest.Context) context.Context {
-	if c != nil && c.Context() != nil {
-		return c.Context()
-	}
-	return context.Background()
-}
-
-func mapAssetError(ctx context.Context, err error) rest.Response {
-	if errors.Is(err, domain.ErrInvalidAssetCriteria) {
-		return rest.BadRequest(codeInvalidCriteria, "asset criteria must be one valid JSON object")
-	}
-	if errors.Is(err, domain.ErrAmbiguousAssetMatch) {
-		return rest.Error(http.StatusConflict, codeAmbiguousAsset, "the filename and criteria match multiple assets")
-	}
-	return mapAssetLookupError(ctx, err)
-}
-
-func mapAssetLookupError(ctx context.Context, err error) rest.Response {
-	if errors.Is(err, domain.ErrAssetNotFound) {
-		return rest.NotFound(codeAssetNotFound, "the requested asset was not found")
-	}
-	if errors.Is(err, domain.ErrAssetAccessDenied) {
-		return rest.Forbidden(codeAccessDenied, "access to the requested asset is denied")
-	}
-	logging.ErrorContext(ctx, "failed to serve asset", "error", err)
-	return rest.InternalServerError(codeInternalError, "the server failed to serve the requested asset")
 }

@@ -9,7 +9,10 @@ import (
 	"github.com/nawaphonOHM/whatever/v3/pkg/rest"
 )
 
-const decimalBase = 10
+const (
+	decimalBase             = 10
+	contentLengthHeaderName = "Content-Length"
+)
 
 func buildAssetResponse(asset *domain.StaticAsset) rest.Response {
 	if asset == nil || asset.Body == nil {
@@ -32,7 +35,7 @@ func withOptionalHeader(response rest.Response, name, value string) rest.Respons
 
 func withOptionalContentLength(response rest.Response, length int64) rest.Response {
 	if length >= 0 {
-		return response.WithHeader("Content-Length", strconv.FormatInt(length, decimalBase))
+		return response.WithHeader(contentLengthHeaderName, strconv.FormatInt(length, decimalBase))
 	}
 	return response
 }

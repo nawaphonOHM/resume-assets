@@ -7,14 +7,45 @@ import (
 
 const integrationDeniedFilename = "denied.js"
 
+type policyHeadCase struct {
+	url    string
+	access string
+	status int
+}
+
 func TestFrameworkAssetAccessPolicy(t *testing.T) {
 	repository := newAccessPolicyRepository()
 	storageClient := &accessPolicyStorage{}
 	client, baseURL := startAccessPolicyServer(t, repository, storageClient)
 	assertPolicyAssetResponse(t, client, baseURL)
+	assertPolicyHeadResponses(t, client, baseURL)
 	assertPolicyDeniedResponse(t, client, baseURL)
 	assertPolicyMissingTagsResponse(t, client, baseURL)
 	assertAccessPolicyStorageCalls(t, storageClient)
+}
+
+func assertPolicyHeadResponses(t *testing.T, client *http.Client, baseURL string) {
+	t.Helper()
+	assertPolicyHeadStatus(t, client, policyHeadCase{
+		status: http.StatusOK, url: baseURL + "/assets/app.js", access: "ALLOW",
+	})
+	response := assertPolicyHeadStatus(t, client, policyHeadCase{
+		status: http.StatusForbidden,
+		url:    baseURL + "/assets/" + integrationDeniedFilename,
+		access: "DENY",
+	})
+	if response.Header.Get("ETag") != "" {
+		t.Fatalf("DENY HEAD response exposed asset metadata: ETag=%q", response.Header.Get("ETag"))
+	}
+}
+
+func assertPolicyHeadStatus(t *testing.T, client *http.Client, test policyHeadCase) *http.Response {
+	t.Helper()
+	response, body := performRequest(t, client, http.MethodHead, test.url)
+	if response.StatusCode != test.status || body != "" {
+		t.Fatalf("%s HEAD response: status=%d body=%q", test.access, response.StatusCode, body)
+	}
+	return response
 }
 
 func assertAccessPolicyStorageCalls(t *testing.T, storageClient *accessPolicyStorage) {

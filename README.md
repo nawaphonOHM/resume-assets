@@ -7,10 +7,11 @@ A small Go HTTP service for serving authorized static assets. It looks up asset 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/assets/{filename}` | Streams one asset whose MongoDB `access` value is exactly `ALLOW`. `filename` is one decoded path segment. |
+| `HEAD` | `/assets/{filename}` | Checks the same MongoDB asset and access policy as GET, then returns metadata headers without fetching or returning the object. |
 | `GET` | `/health` | Framework health probe. |
 | `GET` | `/ready` | Framework readiness probe. |
 
-The only application route is the asset `GET`. Nested asset paths, other HTTP methods, SPA routes, index fallback, and asset modification APIs are not provided. Empty, dot, traversal, and slash-containing filename values are rejected.
+Nested asset paths, other HTTP methods, SPA routes, index fallback, and asset modification APIs are not provided. Empty, dot, traversal, and slash-containing filename values are rejected.
 
 ## MongoDB metadata
 
@@ -21,7 +22,17 @@ The server reads the fixed MongoDB collection named `assets`. Documents use this
   "filename": "app.js",
   "location": "s3://assets-bucket/path/app.js",
   "access": "ALLOW",
-  "tags": { "status": "available", "file_type": "javascript" }
+  "tags": { "status": "available", "file_type": "javascript" },
+  "metaData": {
+    "forCaching": {
+      "ETag": "CJzyvtqFq5cDEAE=",
+      "Last-Modified": "2026-10-08T18:25:30+0000"
+    },
+    "forDownloading": {
+      "Content-Length": 1296,
+      "Content-Type": "application/pdf"
+    }
+  }
 }
 ```
 
@@ -32,7 +43,7 @@ The server reads the fixed MongoDB collection named `assets`. Documents use this
 
 ### Asset lookup criteria
 
-`GET /assets/{filename}` accepts a URL-encoded JSON object as the entire query string, rather than as a named parameter. For example, the following selects the asset whose complete `tags` object is `{"status":"available"}`:
+`GET` and `HEAD /assets/{filename}` accept the same URL-encoded JSON object as the entire query string, rather than as a named parameter. For example, the following selects the asset whose complete `tags` object is `{"status":"available"}`:
 
 ```text
 GET /assets/app.js?%7B%22status%22%3A%22available%22%7D
@@ -41,12 +52,12 @@ GET /assets/app.js?%7B%22status%22%3A%22available%22%7D
 Or use curl to encode the JSON query key:
 
 ```bash
-curl --get --data-urlencode '{"status":"available"}' http://localhost:8080/assets/app.js
+  curl --get --data-urlencode '{"status":"available"}' http://localhost:8080/assets/app.js
 ```
 
 When criteria are supplied, `tags` must match the complete JSON object: field order does not matter in objects (including nested objects), extra or missing fields do not match, and array order matters. Strings, numbers, booleans, `null`, arrays, and nested objects are supported. `{}` matches an explicitly empty `tags` object, not a document with no `tags` field. If no criteria are supplied, lookup uses only `filename`.
 
-No matching asset returns `404`; more than one matching document returns `409` and does not access object storage. A single match proceeds through the existing `access` check and streaming behavior. Malformed JSON, duplicate object keys, non-object criteria, and unsupported query shapes return `400` when observable by the handler.
+No matching asset returns `404`; more than one matching document returns `409`. A single match proceeds through the `access` check: `ALLOW` permits the request and a denied or invalid access value returns `403`. Malformed JSON, duplicate object keys, non-object criteria, and unsupported query shapes return `400` when observable by the handler. Backend lookup failures return a generic `500`.
 
 The framework uses Go's forgiving URL query parser and does not expose the original raw query string. Invalid percent-encoded segments may be discarded, including an entire malformed query, before the handler receives it. In that case the application cannot reliably distinguish the malformed query from an absent query, so it may perform filename-only lookup instead of returning `400`.
 
@@ -62,7 +73,11 @@ db.assets.createIndex({ filename: 1 }, { name: "filename_1" })
 
 Use the actual unique index name shown by `getIndexes()` if it differs, and coordinate the index change with your deployment. Do not drop unrelated indexes. Index creation, index replacement, and insertion of variant documents are operator-controlled; the application never performs them automatically.
 
-Missing metadata and missing storage objects return `404`. Invalid metadata and backend failures return a generic `500` response; internal error details are logged, not returned to clients.
+### HEAD metadata responses
+
+For an authorized asset, `HEAD` selects `metaData.forDownloading` when the filename extension is `.pdf` (case-insensitive), and `metaData.forCaching` for all other filenames. The selected object is a map of HTTP header names to string or integer values; integer values are sent as decimal strings. Unsupported values and unsafe or invalid headers are omitted. An absent or malformed header map does not prevent an authorized `HEAD` from returning `200`, but lookup errors do not include asset metadata headers. `HEAD` returns no response body.
+
+`HEAD` performs only the MongoDB lookup and access check. It does not fetch or verify the object in storage, so it may return `200` from valid metadata even if the corresponding object is missing. `GET` remains storage-backed: it fetches and streams the object, forwarding available storage `Content-Type`, `Content-Length`, `ETag`, and HTTP-formatted `Last-Modified` metadata. A missing asset document returns `404`; a missing object or invalid metadata encountered during `GET` returns `404` or `500`, respectively. Internal backend error details are logged, not returned to clients.
 
 ## Supported object locations
 

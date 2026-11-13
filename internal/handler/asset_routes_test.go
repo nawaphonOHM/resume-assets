@@ -11,16 +11,17 @@ func TestNewAPIRegistration(t *testing.T) {
 	if registration.Group != rest.APIGroupRaw {
 		t.Fatalf("expected raw route group, got %q", registration.Group)
 	}
-	if len(registration.Apis) != 1 {
-		t.Fatalf("expected one application route, got %d", len(registration.Apis))
+	if len(registration.Apis) != 2 {
+		t.Fatalf("expected GET and HEAD routes, got %d", len(registration.Apis))
 	}
-	assertAssetRoute(t, registration.Apis[0])
+	assertAssetRoute(t, registration.Apis[0], rest.GET)
+	assertAssetRoute(t, registration.Apis[1], rest.HEAD)
 }
 
-func assertAssetRoute(t *testing.T, route *rest.ExportableAPI) {
+func assertAssetRoute(t *testing.T, route *rest.ExportableAPI, method any) {
 	t.Helper()
-	if route.Method != rest.GET {
-		t.Fatalf("expected GET route, got %v", route.Method)
+	if route.Method != method {
+		t.Fatalf("expected %v route, got %v", method, route.Method)
 	}
 	if route.Path != RouteAssetPath {
 		t.Fatalf("expected route %q, got %q", RouteAssetPath, route.Path)

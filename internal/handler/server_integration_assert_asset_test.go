@@ -17,6 +17,46 @@ func assertIntegrationAsset(t *testing.T, client *http.Client, baseURL string, s
 	assertIntegrationBodyAndLookup(t, service)
 }
 
+func assertIntegrationHeadResponses(t *testing.T, client *http.Client, baseURL string) {
+	t.Helper()
+	assertCachingHeadResponse(t, client, baseURL)
+	assertDownloadingHeadResponse(t, client, baseURL)
+}
+
+func assertCachingHeadResponse(t *testing.T, client *http.Client, baseURL string) {
+	t.Helper()
+	response, body := performRequest(t, client, http.MethodHead, baseURL+"/assets/app.js")
+	assertSuccessfulHeadResponse(t, response, body, "non-PDF")
+	assertHeadResponseHeader(t, response.Header, "ETag", integrationETag)
+	assertHeadResponseHeader(t, response.Header, "X-Head-Mode", "cache")
+	assertHeadResponseHeader(t, response.Header, "Content-Type", "")
+	assertHeadResponseHeader(t, response.Header, "Content-Length", "")
+}
+
+func assertDownloadingHeadResponse(t *testing.T, client *http.Client, baseURL string) {
+	t.Helper()
+	response, body := performRequest(t, client, http.MethodHead, baseURL+"/assets/app.PDF")
+	assertSuccessfulHeadResponse(t, response, body, "PDF")
+	assertHeadResponseHeader(t, response.Header, "ETag", "")
+	assertHeadResponseHeader(t, response.Header, "X-Head-Mode", "download")
+	assertHeadResponseHeader(t, response.Header, "Content-Type", integrationContentType)
+	assertHeadResponseHeader(t, response.Header, "Content-Length", strconv.Itoa(len(integrationAssetData)))
+}
+
+func assertSuccessfulHeadResponse(t *testing.T, response *http.Response, body, assetType string) {
+	t.Helper()
+	if response.StatusCode != http.StatusOK || body != "" {
+		t.Fatalf("%s HEAD response: status=%d body=%q", assetType, response.StatusCode, body)
+	}
+}
+
+func assertHeadResponseHeader(t *testing.T, headers http.Header, name, want string) {
+	t.Helper()
+	if got := headers.Get(name); got != want {
+		t.Errorf("HEAD header %s: got %q, want %q", name, got, want)
+	}
+}
+
 func assertIntegrationHeaders(t *testing.T, headers http.Header) {
 	t.Helper()
 	expected := []struct{ name, value string }{
